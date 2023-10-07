@@ -82,3 +82,31 @@ ul {
     background-color: var(--right-guess-color);
     transition: all var(--transition-speed) ease-out;
 }
+
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: #00000099;
+    z-index: 5;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.victory-alert {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    font-size: 38px;
+    font-weight: 800;
+    color: #fff;
+    width: 500px;
+    height: 400px;
+    display: flex;
+    background-color: var(--bg-color);
+    border-radius: 15px;
+}
