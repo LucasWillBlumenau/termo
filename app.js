@@ -38,22 +38,12 @@ const Game = (word, maxAttempts) => {
 }
 
 
-const gameLoop = (() => {
-    const forms = document.querySelectorAll('[data-js="word-cards"] > form')
-    const randomWord = getRandomWord()
-    const game = Game(randomWord, forms.length)
-    let currentAttempt = 0
-
-    const start = () => {
-        forms[currentAttempt].addEventListener('submit', guessAWordEvent)
-        addEventsToFormInputs(forms[currentAttempt])
-        disableAllFormsExceptTheFirstOne()
-    }
-
-    const addEventsToFormInputs = form => {
-        const inputs = form.querySelectorAll('input')
-        inputs.forEach(addEventToInput)
-    }
+const DOMManager = (() => {
+    const forms = Array.from(document.querySelectorAll('[data-js="word-cards"] > form'))
+    const formsInputs = forms.map(form => Array.from(form.querySelectorAll('input')))
+    let currentFormIndex = 0
+    
+    const addEventsToFormInputs = () => formsInputs[currentFormIndex].forEach(addEventToInput)
 
     const addEventToInput = input => {
         input.addEventListener('keydown', keyDownEvent)
@@ -94,34 +84,15 @@ const gameLoop = (() => {
         const regexPatter = /[a-z]/
         const [letter] = [...str].filter(char => regexPatter.test(char))
         return letter
-    } 
+    }
 
     const disableAllFormsExceptTheFirstOne = () => {
         const [_, ...formsToBeDisabled] = forms
         formsToBeDisabled.forEach(disableFormInputs)
     }
 
-    const guessAWordEvent = event => {
-        event.preventDefault()
-        const word = getWordFromForm()
-        if (!isWordListed(word)) {
-            alert('A palavra não está listada')
-            return
-        }
-
-        const guessResults = game.guessAWord(word)
-        updateInputColors(guessResults)
-        avaliateGameState()
-    }
-
-    const getWordFromForm = () => {
-        const inputs = Array.from(forms[currentAttempt].querySelectorAll('input'))
-        const word = inputs.map(input => input.value).join('')
-        return word
-    }
-    
     const updateInputColors = guessResults => {
-        const inputs = Array.from(forms[currentAttempt].querySelectorAll('input'))
+        const inputs = formsInputs[currentFormIndex]
         const checkedLetters = []
         guessResults.forEach((guessResult, index) => {
             const input = inputs[index]
@@ -143,6 +114,72 @@ const gameLoop = (() => {
         input.setAttribute('class', className)
         input.setAttribute('style', `--transition-speed: ${transitionSpeed}ms;`)
     }
+    
+    const getWordFromForm = () => {
+        const inputs = Array.from(forms[currentFormIndex].querySelectorAll('input'))
+        const word = inputs.map(input => input.value).join('')
+        return word
+    }
+
+    const enableNextFormAndDisableCurrentOne = () => {
+        disableFormInputs(forms[currentFormIndex])
+        currentFormIndex += 1
+        enableFormInputsAndGiveFocusToTheFirstOne()
+        addEventsToFormInputs()
+    }
+    
+    const disableFormInputs = form => {
+        const inputs = form.querySelectorAll('input')
+        inputs.forEach(input => input.disabled = true)
+    }
+
+    const enableFormInputsAndGiveFocusToTheFirstOne = () => {
+        const inputs = formsInputs[currentFormIndex]
+        inputs.forEach(input => input.disabled = false)
+        inputs[0].focus()
+    }
+
+    const disableCurrentForm = () => disableFormInputs(forms[currentFormIndex])
+
+    const addSubmitEventToForms = event => forms.forEach(form => form.addEventListener('submit', event))
+
+    const getFormsAmount = () => forms.length
+
+    return {
+        addSubmitEventToForms,
+        addEventsToFormInputs,
+        disableAllFormsExceptTheFirstOne,
+        updateInputColors,
+        enableNextFormAndDisableCurrentOne,
+        getWordFromForm,
+        disableCurrentForm,
+        getFormsAmount
+    }
+})()
+
+
+const gameLoop = (() => {
+    const randomWord = getRandomWord()
+    const game = Game(randomWord, DOMManager.getFormsAmount())
+
+    const start = () => {
+        DOMManager.addSubmitEventToForms(guessAWordEvent)
+        DOMManager.addEventsToFormInputs()
+        DOMManager.disableAllFormsExceptTheFirstOne()
+    }
+
+    const guessAWordEvent = event => {
+        event.preventDefault()
+        const word = DOMManager.getWordFromForm()
+        if (!isWordListed(word)) {
+            alert('A palavra não está listada')
+            return
+        }
+
+        const guessResults = game.guessAWord(word)
+        DOMManager.updateInputColors(guessResults)
+        avaliateGameState()
+    }
 
     const avaliateGameState = () => {
         if (game.getIsGameWon())
@@ -150,37 +187,17 @@ const gameLoop = (() => {
         else if (game.getIsGameLost())
             loseTheGameEvent()
         else
-            enableNextFormAndDisableCurrentOne()
+            DOMManager.enableNextFormAndDisableCurrentOne()
     }
 
     const winTheGameEvent = () => {
         alert('Você acertou a palavra')
-        disableFormInputs(forms[currentAttempt])
+        DOMManager.disableCurrentForm()
     }
 
     const loseTheGameEvent = () => {
         alert(`A palavra era ${randomWord}`)
-        disableFormInputs(forms[currentAttempt])
-    }
-
-    const enableNextFormAndDisableCurrentOne = () => {
-        forms[currentAttempt].removeEventListener('submit', guessAWordEvent)
-        disableFormInputs(forms[currentAttempt])
-        currentAttempt += 1
-        forms[currentAttempt].addEventListener('submit', guessAWordEvent)
-        enableFormInputsAndGiveFocusToTheFirstOne(forms[currentAttempt])
-        addEventsToFormInputs(forms[currentAttempt])
-    }
-
-    const disableFormInputs = form => {
-        const inputs = form.querySelectorAll('input')
-        inputs.forEach(input => input.disabled = true)
-    }
-
-    const enableFormInputsAndGiveFocusToTheFirstOne = form => {
-        const inputs = form.querySelectorAll('input')
-        inputs.forEach(input => input.disabled = false)
-        inputs[0].focus()
+        DOMManager.disableCurrentForm()
     }
 
     return { start }

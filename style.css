@@ -1,5 +1,6 @@
 :root {
     --bg-color: #382c2c;
+    --second-bg-color: #6e5858cc;
     --wrapper-color: #222;
     --text-color: #ffffff;
     --right-position-color: #3aa394;
@@ -27,8 +28,15 @@ ul {
     background-color: var(--bg-color);
     color: var(--text-color);
     display: flex;
+    flex-direction: column;
     justify-content: center;
     align-items: center;
+    gap: 35px;
+}
+
+.content h2 {
+    font-size: 72px;
+    font-weight: 800;
 }
 
 .game-wrapper {
@@ -71,7 +79,14 @@ ul {
     width: 20%;
     border-radius: 5px;
     text-transform: uppercase;
+    caret-color: transparent;
+    
 }
+
+.words-list .word .letter-card:focus {
+    outline: none;
+    box-shadow: inset 0px -8px 0px 0px var(--second-bg-color);
+  }
 
 .words-list .word .letter-card.right-position {
     background-color: var(--right-position-color);
