@@ -1,164 +1,190 @@
-const GameManager = word => {
-    const wordsInputsList = document.querySelectorAll('[data-js="word-cards"] > form')
-    let currentAttempt = 0
-    let wordCharList = word.split('')
-    let stateManager = InputsStateManager(wordsInputsList[currentAttempt].children)
-    let guessCharList
-    let lastGuess
-    
-    const guessAWord = () => {
-        lastGuess = stateManager.getGuessWord()
-        checkMatchesAndUpdateInputsState()
-        if (didPlayerWinTheGame())
-            displayGameVictoryAlert()
-        else
-            incrementCurrentAttemptAndSetNewStateManager()
+const Game = (word, maxAttempts) => {
+    let attempts = 0
+    let charsArray = [...word]
+    let isGameLost = false
+    let isGameWon = false
+    let guess
+
+    const guessAWord = guessWord => {
+        guess = guessWord
+        attempts += 1
+        setGameState()
+        return getGuessResult()
     }
 
-    const didPlayerWinTheGame = () => lastGuess === word
-
-    const displayGameVictoryAlert = () => {
-        const victoryAlert = createGameAlert()
-        setTimeout(() => document.body.appendChild(victoryAlert), 500)
-        setTimeout(() => document.body.removeChild(victoryAlert), 1000)
+    const setGameState = () => {
+        isGameWon = word === guess
+        isGameLost = attempts === maxAttempts && !isGameWon
     }
 
-    const createGameAlert = () => {
-        const div = document.createElement('div')
-        div.setAttribute('class', 'modal')
-        div.innerHTML = `
-            <div class="victory-alert">
-                <h2>Você ganhou o jogo</h2>
-            </div>
-        `
-        return div
+    const getGuessResult = () => {
+        const guessWordChars = [...guess]
+        const guessesResult = guessWordChars.map((letter, index) => getLetterGuessState(charsArray[index], letter))
+        return guessesResult
     }
 
-    const checkMatchesAndUpdateInputsState = () => {
-        guessCharList = lastGuess.split('')
-        wordCharList.forEach(updateInputState)
+    const getLetterGuessState = (wordLetter, guessLetter) => {
+        const letter = guessLetter
+        const isRightLetterPosition = guessLetter === wordLetter
+        const wordIncludeLetter = word.includes(guessLetter)
+        return { letter, isRightLetterPosition, wordIncludeLetter }
     }
 
-    const updateInputState = (letter, index) => {
-        if (guessCharList[index] === letter)
-            stateManager.setPositionGuessState(index)
-        else if (word.includes(guessCharList[index]))
-            stateManager.setRightGuessState(index)
-        else
-            stateManager.setWrongGuessState(index)
-    }
+    const getIsGameWon = () => isGameWon
 
-    const incrementCurrentAttemptAndSetNewStateManager = () => {
-        currentAttempt++
-        stateManager.disableInputs()
-        stateManager = InputsStateManager(wordsInputsList[currentAttempt].children)
-        stateManager.enableInputsAndSetFocusToFirstOne()
-    }
+    const getIsGameLost = () => isGameLost
 
-    return { guessAWord }
+    return { guessAWord, getIsGameLost, getIsGameWon }
 }
-
-
-const InputsStateManager = inputs => {
-
-    const inputsList = Array.from(inputs)
-
-    const setClassAttributeAndTransitionSpeed = (className, index) => {
-        inputsList[index].setAttribute('class', className)
-        inputsList[index].setAttribute('style', `--transition-speed: ${index * 400 + 300}ms;`)
-    }
-    
-    const enableInputsAndSetFocusToFirstOne = () => {
-        inputsList.forEach(formSubmitter.enableInput)
-        inputsList[0].focus()
-    }
-
-    const disableInputs = () => inputsList.forEach(formSubmitter.preventInputOfBeEdited)
-    
-    const setWrongGuessState = index => setClassAttributeAndTransitionSpeed('letter-card wrong-guess', index)
-    const setRightGuessState = index => setClassAttributeAndTransitionSpeed('letter-card right-guess', index)
-    const setPositionGuessState = index => setClassAttributeAndTransitionSpeed('letter-card right-position', index)
-    const getGuessWord = () => {
-        const values = inputsList.map(input => input.value)
-        const word = values.join('')
-        return word.toLowerCase()
-    }
-
-    return {
-        setWrongGuessState,
-        setRightGuessState,
-        setPositionGuessState,
-        getGuessWord,
-        disableInputs,
-        enableInputsAndSetFocusToFirstOne,
-    }
-}
-
-
-const formSubmitter = (() => {
-
-    const addInputsEventsToFormInputs = form => {
-        const inputs = Array.from(form.querySelectorAll('input'))
-        inputs.forEach(addEventToInput)
-    }
-
-    const addEventToInput = input => input.addEventListener('input', inputEvent)
-
-    const inputEvent = event => {
-        const input = event.target
-        const typedValue = event.data
-        const letterRegex = /[a-z]/
-        if (!letterRegex.test(typedValue))
-            return
-        input.value  = typedValue
-        input.nextElementSibling.focus()
-    }
-
-    const isFormIsFull = form => {
-        const inputs = form.querySelectorAll('input')
-        for(let input of inputs) {
-            if (input.value === '')
-                return false
-        }
-        return true
-    }
-
-    const preventInputsOfBeEdited = form => {
-        const inputs = form.querySelectorAll('input')
-        inputs.forEach(preventInputOfBeEdited)
-    }
-
-    const preventInputOfBeEdited = input => input.disabled = true
-
-    const enableInput = input => input.disabled = false
-
-    return { preventInputsOfBeEdited, preventInputOfBeEdited, enableInput, isFormIsFull, addInputsEventsToFormInputs }
-})()
 
 
 const gameLoop = (() => {
-    const game = GameManager('house')
     const forms = document.querySelectorAll('[data-js="word-cards"] > form')
-    forms.forEach(formSubmitter.addInputsEventsToFormInputs)
+    const randomWord = getRandomWord()
+    const game = Game(randomWord, forms.length)
+    let currentAttempt = 0
 
-    const submitEvent = event => {
+    const start = () => {
+        forms[currentAttempt].addEventListener('submit', guessAWordEvent)
+        addEventsToFormInputs(forms[currentAttempt])
+        disableAllFormsExceptTheFirstOne()
+    }
+
+    const addEventsToFormInputs = form => {
+        const inputs = form.querySelectorAll('input')
+        inputs.forEach(addEventToInput)
+    }
+
+    const addEventToInput = input => {
+        input.addEventListener('keydown', keyDownEvent)
+        input.addEventListener('input', inputEvent)
+    }
+
+    const keyDownEvent = event => {
+        const input = event.target
+        const keyPressed = event.key
+        const nextSibling = input.nextElementSibling
+        const previousSibling  = input.previousElementSibling
+        const deleteLettersKeys = ['Backspace', 'Delete']
+
+        if (keyPressed === 'ArrowLeft' && previousSibling)
+            previousSibling.focus()
+        else if (keyPressed === 'ArrowRight' && nextSibling)
+            nextSibling.focus()
+        else if (deleteLettersKeys.includes(keyPressed))
+            input.value = ''
+    }
+
+    const inputEvent = event => {
+        const input = event.target
+        const inputValue = input.value
+        const regexPatter = /[a-z]/
+        const typedValue = event.data
+
+        if (regexPatter.test(typedValue)){
+            input.value = typedValue
+            input.nextElementSibling.focus()
+        }
+        else {
+            input.value = inputValue.length > 1? searchLetterInString(inputValue): ''
+        }
+    }
+
+    const searchLetterInString = str => {
+        const regexPatter = /[a-z]/
+        const [letter] = [...str].filter(char => regexPatter.test(char))
+        return letter
+    } 
+
+    const disableAllFormsExceptTheFirstOne = () => {
+        const [_, ...formsToBeDisabled] = forms
+        formsToBeDisabled.forEach(disableFormInputs)
+    }
+
+    const guessAWordEvent = event => {
         event.preventDefault()
-        console.log(event.target);
-        if (!formSubmitter.isFormIsFull(event.target))
+        const word = getWordFromForm()
+        if (!isWordListed(word)) {
+            alert('A palavra não está listada')
             return
-        game.guessAWord()
+        }
+
+        const guessResults = game.guessAWord(word)
+        updateInputColors(guessResults)
+        avaliateGameState()
     }
 
-    const addSubmitEventToForm = form => form.addEventListener('submit', submitEvent)
+    const getWordFromForm = () => {
+        const inputs = Array.from(forms[currentAttempt].querySelectorAll('input'))
+        const word = inputs.map(input => input.value).join('')
+        return word
+    }
     
-    const run = () => {
-        const [, ...disabledForms] = forms
-        disabledForms.forEach(formSubmitter.preventInputsOfBeEdited)
-        forms.forEach(addSubmitEventToForm)
+    const updateInputColors = guessResults => {
+        const inputs = Array.from(forms[currentAttempt].querySelectorAll('input'))
+        const checkedLetters = []
+        guessResults.forEach((guessResult, index) => {
+            const input = inputs[index]
+            const transitionSpeed = index * 200 + 300
+            const letterInSeen = checkedLetters.includes(guessResult.letter)
+            checkGuessStateAndUpdateInputColor(input, { letterInSeen, ...guessResult }, transitionSpeed)
+            checkedLetters.push(guessResult.letter)
+        })
     }
 
-    return { run }
+    const checkGuessStateAndUpdateInputColor = (input, guessResult, transitionSpeed) => {
+        if (guessResult.isRightLetterPosition)
+            setClassAttributeAndTransitionSpeed(input, 'letter-card right-position', transitionSpeed)
+        else if (guessResult.wordIncludeLetter && !guessResult.letterInSeen)
+            setClassAttributeAndTransitionSpeed(input, 'letter-card right-guess', transitionSpeed)
+    }
+
+    const setClassAttributeAndTransitionSpeed = (input, className, transitionSpeed) => {
+        input.setAttribute('class', className)
+        input.setAttribute('style', `--transition-speed: ${transitionSpeed}ms;`)
+    }
+
+    const avaliateGameState = () => {
+        if (game.getIsGameWon())
+            winTheGameEvent()
+        else if (game.getIsGameLost())
+            loseTheGameEvent()
+        else
+            enableNextFormAndDisableCurrentOne()
+    }
+
+    const winTheGameEvent = () => {
+        alert('Você acertou a palavra')
+        disableFormInputs(forms[currentAttempt])
+    }
+
+    const loseTheGameEvent = () => {
+        alert(`A palavra era ${randomWord}`)
+        disableFormInputs(forms[currentAttempt])
+    }
+
+    const enableNextFormAndDisableCurrentOne = () => {
+        forms[currentAttempt].removeEventListener('submit', guessAWordEvent)
+        disableFormInputs(forms[currentAttempt])
+        currentAttempt += 1
+        forms[currentAttempt].addEventListener('submit', guessAWordEvent)
+        enableFormInputsAndGiveFocusToTheFirstOne(forms[currentAttempt])
+        addEventsToFormInputs(forms[currentAttempt])
+    }
+
+    const disableFormInputs = form => {
+        const inputs = form.querySelectorAll('input')
+        inputs.forEach(input => input.disabled = true)
+    }
+
+    const enableFormInputsAndGiveFocusToTheFirstOne = form => {
+        const inputs = form.querySelectorAll('input')
+        inputs.forEach(input => input.disabled = false)
+        inputs[0].focus()
+    }
+
+    return { start }
 })()
 
 
-gameLoop.run()
+gameLoop.start()
